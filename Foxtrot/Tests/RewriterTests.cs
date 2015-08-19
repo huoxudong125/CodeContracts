@@ -66,7 +66,29 @@ namespace Tests
             options.UseTestHarness = true;
             TestDriver.BuildRewriteRun(options);
         }
+
         #endregion
+        [DeploymentItem("Foxtrot\\Tests\\TestInputs.xml"), DataSource("Microsoft.VisualStudio.TestTools.DataSource.XML", "|DataDirectory|\\TestInputs.xml", "AsyncPostconditions", DataAccessMethod.Sequential)]
+        [TestMethod]
+        [TestCategory("Runtime"), TestCategory("CoreTest"), TestCategory("Roslyn"), TestCategory("VS14")]
+        public void TestAsyncPostconditions()
+        {
+            var options = CreateRoslynOptions("VS14RC3");
+            TestDriver.BuildRewriteRun(options);
+        }
+
+        [DeploymentItem("Foxtrot\\Tests\\TestInputs.xml"), DataSource("Microsoft.VisualStudio.TestTools.DataSource.XML", "|DataDirectory|\\TestInputs.xml", "AsyncPostconditions", DataAccessMethod.Sequential)]
+        [TestMethod]
+        [TestCategory("Runtime"), TestCategory("CoreTest"), TestCategory("Roslyn"), TestCategory("VS14")]
+        public void TestAsyncPostconditionsV45()
+        {
+            var options = new Options(this.TestContext);
+            options.FoxtrotOptions = options.FoxtrotOptions + String.Format(" /throwonfailure /rw:{0}.exe,TestInfrastructure.RewriterMethods", Path.GetFileNameWithoutExtension(options.TestName));
+            options.BuildFramework = @".NETFramework\v4.5";
+            options.ContractFramework = @".NETFramework\v4.0";
+            options.UseTestHarness = true;
+            TestDriver.BuildRewriteRun(options);
+        }
 
         #region Roslyn compiler unit tests
         [DeploymentItem("Foxtrot\\Tests\\TestInputs.xml"), DataSource("Microsoft.VisualStudio.TestTools.DataSource.XML", "|DataDirectory|\\TestInputs.xml", "TestFile", DataAccessMethod.Sequential)]
@@ -114,7 +136,8 @@ namespace Tests
         }
 
         /// <summary>
-        /// Unit test for #47 - "Could not resolve type reference" for some iterator methods in VS2015
+        /// Unit test for #47 - "Could not resolve type reference" for some iterator methods in VS2015 and
+        /// #186 - ccrewrite produces an incorrect type name in IteratorStateMachineAttribute with some generic types
         /// </summary>
         [DeploymentItem("Foxtrot\\Tests\\TestInputs.xml"), DataSource("Microsoft.VisualStudio.TestTools.DataSource.XML", "|DataDirectory|\\TestInputs.xml", "IteratorWithComplexGeneric", DataAccessMethod.Sequential)]
         [TestMethod]
@@ -125,6 +148,7 @@ namespace Tests
             // Bug with metadata reader could be reproduced only with a new mscorlib and new System.dll.
             options.BuildFramework = @".NetFramework\v4.6";
             options.ReferencesFramework = @".NetFramework\v4.6";
+            options.DeepVerify = true;
             TestDriver.BuildRewriteRun(options);
         }
 
