@@ -445,7 +445,15 @@ namespace System.Compiler.Metadata{
 #endif
         return assembly;
 #if !FxCop
-      }catch(Exception e){
+      }
+      catch(Microsoft.Cci.Pdb.NoNameStreamPdbException e)
+      {
+        if (this.module == null) return null;
+        if (this.module.MetadataImportWarnings == null) this.module.MetadataImportWarnings = new ArrayList();
+        this.module.MetadataImportWarnings.Add(e);
+        return this.module as AssemblyNode;
+      }
+      catch(Exception e){
         if (this.module == null) return null;
         if (this.module.MetadataImportErrors == null) this.module.MetadataImportErrors = new ArrayList();
         this.module.MetadataImportErrors.Add(e);
@@ -4249,6 +4257,18 @@ namespace System.Compiler.Metadata{
             this.currentItr++;
             switch (c) {
               case ',':
+                    // A comma may separate a type name from its assembly name or a type argument from
+                    // another type argument.
+                    // If processing non-type argument or a type argument with assembly name,
+                    // process the characters after the comma as an assembly name.
+                    //
+                    // If the next character is whitespace, assume that it delineates the start of an assembly name so
+                    // end the current identifier by going to done label.
+                    if (this.currentItr < this.typeNameString.Length && char.IsWhiteSpace(this.typeNameString[this.currentItr]))
+                    {
+                        goto done;
+                    }
+                    break;
               case '[':
               case ']':
               case '&':

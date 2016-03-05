@@ -1,13 +1,16 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Diagnostics.Contracts;
 using System.IO;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using System.Linq;
 
 namespace Tests
 {
+    [Serializable]
     internal sealed class Options
     {
-        const string RelativeRoot = @"..\..\..\";
+        const string RelativeRoot = @"..\..\..\..\";
 
         const string TestHarnessDirectory = @"Microsoft.Research\RegressionTest\ClousotTestHarness\bin\debug";
 
@@ -53,10 +56,6 @@ namespace Tests
         /// </summary>
         public bool DeepVerify = false;
 
-        private int instance;
-
-        private TestContext TestContext;
-
         public List<string> LibPaths
         {
             get
@@ -70,8 +69,8 @@ namespace Tests
         {
             get
             {
-                if (SourceFile != null) { return Path.GetFileNameWithoutExtension(SourceFile) + "_" + instance; }
-                else return instance.ToString();
+                if (SourceFile != null) { return Path.GetFileNameWithoutExtension(SourceFile); }
+                else return "Unknown";
             }
         }
 
@@ -224,69 +223,88 @@ namespace Tests
 
         public string CompilerOptions { get; set; }
 
-        private class TestGroup
+        public Options(
+            string sourceFile,
+            string foxtrotOptions,
+            bool useContractReferenceAssemblies,
+            string compilerOptions,
+            string[] references,
+            string[] libPaths,
+            string compilerCode,
+            bool useBinDir,
+            bool useExe,
+            bool mustSucceed,
+            bool optimize,
+            bool releaseMode,
+            bool pdbOnly)
         {
-            int instance;
+            this.SourceFile = sourceFile;
+            this.FoxtrotOptions = foxtrotOptions;
+            this.UseContractReferenceAssemblies = useContractReferenceAssemblies;
+            this.CompilerOptions = compilerOptions;
+            this.References = new List<string>(new[] { "mscorlib.dll", "System.dll", "ClousotTestHarness.dll" });
+            this.References.AddRange(references);
+            this.libPaths = new List<string>(libPaths ?? Enumerable.Empty<string>());
+            this.compilerCode = compilerCode;
+            this.UseBinDir = useBinDir;
+            this.UseExe = useExe;
+            this.MustSucceed = mustSucceed;
+            this.Optimize = optimize;
+            this.ReleaseMode = releaseMode;
+            this.PdbOnly = pdbOnly;
 
-            private TestGroup() { }
-
-            public int Instance { get { return this.instance; } }
-
-            void Increment() { this.instance++; }
-
-            private static readonly Dictionary<string, TestGroup> testGroups = new Dictionary<string, TestGroup>();
-
-            public static TestGroup Get(string testGroupName)
-            {
-                TestGroup result;
-                if (!testGroups.TryGetValue(testGroupName, out result))
-                {
-                    result = new TestGroup();
-                    testGroups.Add(testGroupName, result);
-                }
-                else
-                {
-                    result.Increment();
-                }
-
-                return result;
-            }
+            this.RootDirectory = Path.GetFullPath(RelativeRoot);
+        }
+        public Options(
+            string sourceFile,
+            string foxtrotOptions,
+            bool useContractReferenceAssemblies,
+            string compilerOptions,
+            string[] references,
+            string[] libPaths,
+            string compilerCode,
+            bool useBinDir,
+            bool useExe,
+            bool mustSucceed)
+            : this(
+            sourceFile,
+            foxtrotOptions,
+            useContractReferenceAssemblies,
+            compilerOptions,
+            references,
+            libPaths,
+            compilerCode,
+            useBinDir,
+            useExe,
+            mustSucceed,
+            false,
+            false,
+            false)
+        {
         }
 
-        private readonly TestGroup Group;
-
-        public Options(string testName, string foxtrotOptions, TestContext context)
-            : this(context)
+        public Options WithSourceFile(string sourceFile)
         {
-            this.SourceFile = testName;
-            FoxtrotOptions = foxtrotOptions;
-        }
+            Contract.Requires(!string.IsNullOrEmpty(sourceFile));
 
-        public Options(TestContext context)
-        {
-            this.TestContext = context;
-            this.Group = TestGroup.Get(context.TestName);
-
-            RootDirectory = Path.GetFullPath(RelativeRoot);
-            this.instance = this.Group.Instance;
-
-            var dataRow = context.DataRow;
-            if (dataRow != null)
-            {
-                SourceFile = LoadString(dataRow, "Name");
-                FoxtrotOptions = LoadString(dataRow, "FoxtrotOptions");
-                UseContractReferenceAssemblies = LoadBool("ContractReferenceAssemblies", dataRow, true);
-                CompilerOptions = LoadString(dataRow, "CompilerOptions");
-                References = LoadList(dataRow, "References", "mscorlib.dll", "System.dll", "ClousotTestHarness.dll");
-                libPaths = LoadList(dataRow, "LibPaths", MakeAbsolute(TestHarnessDirectory));
-                compilerCode = LoadString("Compiler", dataRow, "CS");
-                UseBinDir = LoadBool("BinDir", dataRow, false);
-                UseExe = LoadBool("UseExe", dataRow, true);
-                MustSucceed = LoadBool("MustSucceed", dataRow, true);
-            }
+            return new Options(
+                    sourceFile: sourceFile,
+                    foxtrotOptions: FoxtrotOptions,
+                    useContractReferenceAssemblies: UseContractReferenceAssemblies,
+                    compilerOptions: CompilerOptions,
+                    references: References.ToArray(),
+                    libPaths: LibPaths.ToArray(),
+                    compilerCode: compilerCode,
+                    useBinDir: UseBinDir,
+                    useExe: UseExe,
+                    mustSucceed: MustSucceed);
         }
 
         public bool ReleaseMode { get; set; }
+
+        public bool Optimize { get; set; }
+
+        public bool PdbOnly { get; set; }
 
         private static string LoadString(System.Data.DataRow dataRow, string name)
         {
@@ -352,21 +370,6 @@ namespace Tests
         /// </summary>
         public string GetFullExecutablePath(string relativePath)
         {
-            if (this.TestContext != null)
-            {
-                var deployed = Path.Combine(this.TestContext.DeploymentDirectory, Path.GetFileName(relativePath));
-
-                if (File.Exists(deployed))
-                {
-                    // sanity check
-                    if (File.Exists(Path.Combine(this.TestContext.DeploymentDirectory, "Foxtrot.Extractor.dll")) &&
-                        File.Exists(Path.Combine(this.TestContext.DeploymentDirectory, "Microsoft.Contracts.dll")))
-                    {
-                        return deployed;
-                    }
-                }
-            }
-
             return MakeAbsolute(relativePath);
         }
 

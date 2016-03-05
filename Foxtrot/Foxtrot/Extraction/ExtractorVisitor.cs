@@ -23,6 +23,7 @@ using Microsoft.Research.DataStructures;
 
 namespace Microsoft.Contracts.Foxtrot
 {
+    [ContractVerification(false)]
     internal class ExtractorVisitor : StandardVisitor
     {
         // Private Fields
@@ -76,7 +77,7 @@ namespace Microsoft.Contracts.Foxtrot
         /// 
         /// </summary>
         /// <param name="ultimateTargetAssembly">specify X if extracting from X.Contracts.dll, otherwise null</param>
-        [ContractVerification(true)]
+        [ContractVerification(false)]
         public ExtractorVisitor(ContractNodes /*!*/ contractNodes,
             AssemblyNode ultimateTargetAssembly,
             AssemblyNode realAssembly,
@@ -1449,6 +1450,33 @@ namespace Microsoft.Contracts.Foxtrot
                         this.Visit(method);
                     }
                     return closureClass;
+                }
+            }
+
+            public override void VisitReturn(Return returnStatement)
+            {
+                Expression source = returnStatement.Expression;
+                Construct sourceConstruct = source as Construct;
+
+                if (sourceConstruct != null)
+                {
+                    if (sourceConstruct.Type != null && sourceConstruct.Type.Name.Name.StartsWith(this.closureTag))
+                    {
+                        if (sourceConstruct.Type.Template != null)
+                        {
+                            TypeNode template = sourceConstruct.Type.Template;
+                            while (template.Template != null)
+                            {
+                                template = template.Template;
+                            }
+
+                            this.closureClass = (Class)template;
+                        }
+                        else
+                        {
+                            this.closureClass = (Class)sourceConstruct.Type;
+                        }
+                    }
                 }
             }
 

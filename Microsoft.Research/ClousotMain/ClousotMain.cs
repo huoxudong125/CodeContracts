@@ -63,10 +63,6 @@ namespace Microsoft.Research.CodeAnalysis
       where Type : IEquatable<Type>
       where Method : IEquatable<Method>
     {
-
-      // We do it here becase we hope we can trigger some work of the jit 
-      args = PipesUtils.WaitForArgsIfNeeded(args);
-
       using (var binder = new TypeBinder<Local, Parameter, Method, Field, Property, Event, Type, Attribute, Assembly>(
         args, mdDecoder, contractDecoder, assemblyCache, outputFactory, cacheAccessorFactories
         ))
@@ -1424,7 +1420,7 @@ namespace Microsoft.Research.CodeAnalysis
 
         var totalMethods = this.methodNumbers.Count;
         var progressChars = 0;
-        var stopWatch = new Stopwatch();
+        var stopWatch = new CustomStopwatch();
         stopWatch.Start();
 
         output.StartAssembly(assembly);
@@ -1465,7 +1461,7 @@ namespace Microsoft.Research.CodeAnalysis
       }
 
 
-      private int AnalyzeAssemblyInternal(int totalMethods, int progressChars, Stopwatch stopWatch)
+      private int AnalyzeAssemblyInternal(int totalMethods, int progressChars, CustomStopwatch stopWatch)
       {
         // Forward object invariant inference
         if (this.options.InferObjectInvariantsForward)
@@ -1487,7 +1483,7 @@ namespace Microsoft.Research.CodeAnalysis
         return progressChars;
       }
 
-      private int AnalyzeMethodsInAssembly(int totalMethods, int progressChars, Stopwatch stopWatch)
+      private int AnalyzeMethodsInAssembly(int totalMethods, int progressChars, CustomStopwatch stopWatch)
       {
         #region Analyze the methods in this assembly
 
@@ -1501,9 +1497,9 @@ namespace Microsoft.Research.CodeAnalysis
         return progressChars;
       }
 
-      private void DoWork(int totalMethods, ref int progressChars, Stopwatch assemblyStopWatch, Method method)
+      private void DoWork(int totalMethods, ref int progressChars, CustomStopwatch assemblyStopWatch, Method method)
       {
-        var stopWatch = new Stopwatch();
+        var stopWatch = new CustomStopwatch();
         stopWatch.Start();
         var orderNumber = this.methodNumbers.GetMethodNumber(method);
         var overallTime = TimeSpan.MaxValue; // Assume by default that the method has timed out
@@ -1847,7 +1843,7 @@ namespace Microsoft.Research.CodeAnalysis
 
         cdriver = GetClassDriver(method, false);
 
-        var stopWatch = new Stopwatch();
+        var stopWatch = new CustomStopwatch();
         stopWatch.Start();
         var mdriver = this.driver.MethodDriver(method, cdriver, analysisFlags.RemoveInferredPreconditions);
         this.CFGConstructionTime = stopWatch.Elapsed;
@@ -3054,7 +3050,7 @@ namespace Microsoft.Research.CodeAnalysis
 #endif
 
       OnDemandMap<string, long> phaseTimes;
-      readonly Stopwatch lastPhaseStart = new Stopwatch();
+      readonly CustomStopwatch lastPhaseStart = new CustomStopwatch();
       
       string lastPhaseName;
       private ContractDensity ContractDensity;
